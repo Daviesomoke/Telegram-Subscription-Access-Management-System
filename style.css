@@ -1,0 +1,215 @@
+
+
+
+
+
+/* Premium Dark Dashboard */
+:root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --text: #e0e0e0;
+    --accent: #7c4dff;
+    --green: #00c853;
+    --red: #ff1744;
+    --border: #2a2a2a;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body.dark {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+    padding: 20px;
+    max-width: 1000px;
+    margin: auto;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+
+header h1 {
+    font-size: 1.8rem;
+}
+
+.btn-logout {
+    background: var(--red);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+.card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border);
+}
+
+.card h2 {
+    margin-bottom: 15px;
+    color: var(--accent);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th,
+td {
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+tr:hover {
+    background: #222;
+}
+
+.actions form {
+    display: inline-block;
+    margin-right: 5px;
+}
+
+input[type="number"] {
+    background: #2a2a2a;
+    border: 1px solid var(--border);
+    color: white;
+    padding: 5px;
+    border-radius: 4px;
+    width: 70px;
+}
+
+button {
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    color: white;
+    font-size: 0.9rem;
+}
+
+.btn-approve {
+    background: var(--green);
+}
+
+.btn-reject {
+    background: var(--red);
+}
+
+.btn-extend {
+    background: #ff9100;
+}
+
+.btn-ban {
+    background: #b71c1c;
+}
+
+.flash {
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+
+.flash.success {
+    background: #1b5e20;
+}
+
+.flash.error,
+.flash.warning {
+    background: #b71c1c;
+}
+
+.flash.danger {
+    background: #b71c1c;
+}
+
+/* Login page */
+.login-container {
+    max-width: 400px;
+    margin: 100px auto;
+    background: var(--card);
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.login-container input {
+    width: 100%;
+    padding: 12px;
+    margin: 15px 0;
+    background: #2a2a2a;
+    border: 1px solid var(--border);
+    color: white;
+    border-radius: 6px;
+}
+
+.login-container button {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    font-size: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    body.dark {
+        padding: 10px;
+    }
+
+    header {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
+        display: block;
+    }
+
+    thead tr {
+        display: none;
+    }
+
+    td {
+        position: relative;
+        padding-left: 50%;
+    }
+
+    td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        font-weight: bold;
+        color: var(--accent);
+    }
+}
