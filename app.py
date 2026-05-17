@@ -4,8 +4,6 @@
 
 
 
-
-
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app
 from datetime import datetime, timedelta
@@ -85,6 +83,7 @@ def create_app(bot_app):
             bot = current_app.config['BOT_APP'].bot
 
             now = datetime.utcnow()
+            # Use admin-specified days only if provided, otherwise default to 30
             days = int(request.form.get("days", 30))
             if user.payment_status == "approved" and user.expiry_date and user.expiry_date > now:
                 user.expiry_date += timedelta(days=days)
@@ -118,7 +117,7 @@ def create_app(bot_app):
                         f"Group: {group.name}\n"
                         f"Your access expires on: {user.expiry_date.strftime('%Y-%m-%d %H:%M')} UTC\n\n"
                         f"One-time invite link: {user.invite_link}\n"
-                        "This link works only for your account – do not share it."
+                        "This link works only for your account - do not share it."
                     )
                 )
             except Exception:

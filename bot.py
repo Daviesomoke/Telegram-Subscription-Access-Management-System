@@ -37,39 +37,46 @@ logger = logging.getLogger(__name__)
 # Conversation states
 SELECT_GROUP, SELECT_DURATION, SELECT_PAYMENT, UPLOAD_PROOF = range(4)
 
-payment_instructions = {
-    "mpesa": (
-        "M-Pesa\n"
-        "Send {price} {currency} to:\n"
-        "Phone: " + M_PESA_PHONE + "\n"
-        "Name: " + M_PESA_NAME + "\n\n"
-        "After payment, upload a screenshot of the confirmation message."
-    ),
-    "skrill": (
-        "Skrill\n"
-        "Send {price} {currency} to:\n"
-        "Email: " + SKRILL_EMAIL + "\n\n"
-        "Upload a screenshot or the transaction ID after payment."
-    ),
-    "neteller": (
-        "Neteller\n"
-        "Send {price} {currency} to:\n"
-        "Email: " + NETELLER_EMAIL + "\n\n"
-        "Upload a screenshot of the payment confirmation."
-    ),
-    "revolut": (
-        "Revolut\n"
-        "Send {price} {currency} to:\n"
-        "Username: " + REVOLUT_USERNAME + "\n\n"
-        "Upload the payment proof."
-    ),
-    "usdt": (
-        "USDT (TRC20)\n"
-        "Send {price} USDT to:\n"
-        + USDT_TRC20_ADDRESS + "\n\n"
-        "Upload a screenshot of the transaction or paste the TXID."
-    ),
-}
+def get_payment_text(method, price):
+    """Return payment instructions for the given method and price."""
+    if method == "mpesa":
+        return (
+            f"M-Pesa\n"
+            f"Send ${price} USD to:\n"
+            f"Phone: {M_PESA_PHONE}\n"
+            f"Name: {M_PESA_NAME}\n\n"
+            f"After payment, upload a screenshot of the confirmation message."
+        )
+    elif method == "skrill":
+        return (
+            f"Skrill\n"
+            f"Send ${price} USD to:\n"
+            f"Email: {SKRILL_EMAIL}\n\n"
+            f"Upload a screenshot or the transaction ID after payment."
+        )
+    elif method == "neteller":
+        return (
+            f"Neteller\n"
+            f"Send ${price} USD to:\n"
+            f"Email: {NETELLER_EMAIL}\n\n"
+            f"Upload a screenshot of the payment confirmation."
+        )
+    elif method == "revolut":
+        return (
+            f"Revolut\n"
+            f"Send ${price} USD to:\n"
+            f"Username: {REVOLUT_USERNAME}\n\n"
+            f"Upload the payment proof."
+        )
+    elif method == "usdt":
+        return (
+            f"USDT (TRC20)\n"
+            f"Send {price} USDT to:\n"
+            f"{USDT_TRC20_ADDRESS}\n\n"
+            f"Upload a screenshot of the transaction or paste the TXID."
+        )
+    else:
+        return "Invalid payment method selected."
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show list of available groups."""
@@ -93,7 +100,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return SELECT_GROUP
 
 async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User selected a group – store it and ask for duration."""
+    """User selected a group - store it and ask for duration."""
     query = update.callback_query
     await query.answer()
     group_id = int(query.data.split("_")[1])
@@ -110,17 +117,14 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = []
         for months_str, multiplier in DURATION_MULTIPLIERS.items():
             months = int(months_str)
-            days = months * 30 if months < 12 else 365
             price = round(group.monthly_price * multiplier, 2)
-            currency = "USD"
             button_text = f"{months} month(s) - ${price}"
             callback_data = f"dur_{months}_{price}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
-            f"Group: {group.name}\n"
-            "Select subscription duration:",
+            f"Group: {group.name}\nSelect subscription duration:",
             reply_markup=reply_markup,
         )
     finally:
@@ -128,7 +132,7 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return SELECT_DURATION
 
 async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User selected duration – store it and show payment methods."""
+    """User selected duration - store it and show payment methods."""
     query = update.callback_query
     await query.answer()
     _, months, price = query.data.split("_")
@@ -149,31 +153,27 @@ async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await query.edit_message_text(
-        f"Duration: {months} month(s)\n"
-        f"Price: ${price}\n\n"
-        "Choose your payment method:",
+        f"Duration: {months} month(s)\nPrice: ${price}\n\nChoose your payment method:",
         reply_markup=reply_markup,
     )
     return SELECT_PAYMENT
 
 async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User chose payment method – show instructions and ask for proof."""
+    """User chose payment method - show instructions and ask for proof."""
     query = update.callback_query
     await query.answer()
     method = query.data.replace("pay_", "")
     context.user_data["payment_method"] = method
 
     price = context.user_data.get("price", 0)
-    currency = "USD"
-    instruction = payment_instructions.get(method, "Invalid method").format(price=price, currency=currency)
+    instruction = get_payment_text(method, price)
     await query.edit_message_text(
-        f"{instruction}\n\n"
-        "Send a screenshot or paste the transaction reference now."
+        f"{instruction}\n\nSend a screenshot or paste the transaction reference now."
     )
     return UPLOAD_PROOF
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User sent payment proof – save to DB and notify admin."""
+    """User sent payment proof - save to DB and notify admin."""
     user = update.effective_user
     method = context.user_data.get("payment_method", "unknown")
 

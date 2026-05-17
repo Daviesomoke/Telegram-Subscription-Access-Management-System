@@ -1,16 +1,18 @@
 # Telegram Subscription Access Bot
 
-A lightweight, production‑ready system that lets you sell access to a private Telegram group/channel using external payment methods (M‑Pesa, Skrill, Neteller, Revolut, USDT). It includes an admin web dashboard and enforces **single‑use invite links** so only one user per payment can join.
+A lightweight, production-ready system that lets you sell access to private Telegram groups/channels using external payment methods (M-Pesa, Skrill, Neteller, Revolut, USDT). It includes an admin web dashboard and enforces single-use invite links so only one user per payment can join.
 
 ## Features
 
-- `/start` onboarding with payment method selection
+- /start onboarding with group selection and duration choice
 - Users upload payment proof (screenshot / TXID)
 - Admin reviews and approves/rejects via dark web dashboard
-- **Single‑use invite links** (member_limit=1) – no sharing possible
+- Single-use invite links (member_limit=1) - no sharing possible
 - Automatic removal of expired subscribers (kicked from group)
 - Subscription renewal, extension, and ban/unban
 - Background expiry checker (every hour)
+- Multi-group support
+- Multiple subscription durations: 1, 3, 6, 12 months
 
 ## Tech Stack
 
@@ -20,11 +22,20 @@ A lightweight, production‑ready system that lets you sell access to a private 
 - SQLite (database)
 - HTML + CSS (dark premium dashboard)
 
-## Setup & Deployment
+## Production Deployment - Step by Step
 
-### 1. Clone or download the folder
+### Step 1: Get a VPS or Server
+
+Get a Linux VPS (Ubuntu 22.04 recommended) from any provider:
+
+- DigitalOcean
+- Hetzner
+- Linode
+- AWS EC2
+- Any VPS with at least 1GB RAM
+
+### Step 2: Connect to your server
 
 ```bash
-git clone <your-repo> tg-subscription-bot
-cd tg-subscription-bot
+ssh root@your-server-ip
 ```

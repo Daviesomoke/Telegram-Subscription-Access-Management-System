@@ -3,6 +3,8 @@
 
 
 
+
+
 /* Premium Dark Dashboard */
 :root {
     --bg: #0f0f0f;
@@ -23,10 +25,11 @@
 body.dark {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
     padding: 20px;
-    max-width: 1000px;
+    max-width: 1100px;
     margin: auto;
+    line-height: 1.5;
 }
 
 a {
@@ -40,19 +43,27 @@ header {
     align-items: center;
     margin-bottom: 30px;
     border-bottom: 1px solid var(--border);
-    padding-bottom: 10px;
+    padding-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
 header h1 {
     font-size: 1.8rem;
+    font-weight: 600;
 }
 
 .btn-logout {
     background: var(--red);
     color: white;
-    padding: 8px 16px;
+    padding: 8px 18px;
     border-radius: 6px;
-    font-weight: bold;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-logout:hover {
+    background: #d50000;
 }
 
 .card {
@@ -66,28 +77,43 @@ header h1 {
 .card h2 {
     margin-bottom: 15px;
     color: var(--accent);
+    font-size: 1.3rem;
+}
+
+/* Table wrapper for horizontal scroll on mobile */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 10px;
+    min-width: 600px;
 }
 
 th,
 td {
-    padding: 12px 8px;
+    padding: 12px 10px;
     text-align: left;
     border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
 }
 
 th {
     color: var(--accent);
     font-weight: 600;
+    white-space: nowrap;
 }
 
 tr:hover {
     background: #222;
+}
+
+.actions {
+    white-space: nowrap;
 }
 
 .actions form {
@@ -111,7 +137,12 @@ button {
     font-weight: bold;
     cursor: pointer;
     color: white;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    transition: filter 0.2s;
+}
+
+button:hover {
+    filter: brightness(1.15);
 }
 
 .btn-approve {
@@ -131,9 +162,10 @@ button {
 }
 
 .flash {
-    padding: 10px;
+    padding: 12px 15px;
     border-radius: 5px;
     margin: 10px 0;
+    font-weight: 500;
 }
 
 .flash.success {
@@ -159,6 +191,11 @@ button {
     text-align: center;
 }
 
+.login-container h1 {
+    margin-bottom: 20px;
+    color: var(--text);
+}
+
 .login-container input {
     width: 100%;
     padding: 12px;
@@ -176,40 +213,99 @@ button {
     font-size: 1rem;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
+.login-container button:hover {
+    filter: brightness(1.1);
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
     body.dark {
         padding: 10px;
     }
 
     header {
         flex-direction: column;
+        align-items: flex-start;
         gap: 10px;
     }
 
-    table,
-    thead,
-    tbody,
-    th,
-    td,
-    tr {
-        display: block;
+    header h1 {
+        font-size: 1.4rem;
     }
 
-    thead tr {
+    .card {
+        padding: 15px;
+    }
+
+    .card h2 {
+        font-size: 1.1rem;
+    }
+
+    /* Stack table rows on mobile */
+    table {
+        min-width: 100%;
+    }
+
+    thead {
         display: none;
     }
 
-    td {
-        position: relative;
-        padding-left: 50%;
+    tbody tr {
+        display: block;
+        margin-bottom: 15px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        background: #111;
     }
 
-    td:before {
+    tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 5px;
+        border-bottom: 1px solid #1a1a1a;
+        font-size: 0.9rem;
+    }
+
+    tbody td:last-child {
+        border-bottom: none;
+    }
+
+    tbody td::before {
         content: attr(data-label);
-        position: absolute;
-        left: 10px;
-        font-weight: bold;
+        font-weight: 600;
         color: var(--accent);
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+
+    .actions {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .actions form {
+        margin: 0;
+    }
+
+    input[type="number"] {
+        width: 50px;
+    }
+
+    button {
+        padding: 5px 10px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .login-container {
+        margin: 50px 10px;
+        padding: 20px;
+    }
+
+    .login-container h1 {
+        font-size: 1.2rem;
     }
 }
