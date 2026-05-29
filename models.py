@@ -4,25 +4,31 @@
 
 
 
+
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from config import DATABASE_URL, GROUPS_CONFIG
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# FIX: connect_args={"check_same_thread": False} is SQLite-only
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
+
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
+
 
 class Group(Base):
     __tablename__ = "groups"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    chat_id = Column(Integer, unique=True, nullable=False)   # Telegram chat ID
+    chat_id = Column(Integer, unique=True, nullable=False)
     monthly_price = Column(Float, nullable=False, default=10.0)
 
     users = relationship("User", back_populates="group")
+
 
 class User(Base):
     __tablename__ = "users"
@@ -42,9 +48,10 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
 Base.metadata.create_all(bind=engine)
 
-# Seed groups from config
+
 def seed_groups():
     db = SessionLocal()
     try:
@@ -60,5 +67,6 @@ def seed_groups():
         db.commit()
     finally:
         db.close()
+
 
 seed_groups()

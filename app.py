@@ -4,11 +4,29 @@
 
 
 
+
 import os
+import asyncio
 from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app
 from datetime import datetime, timedelta
 from models import SessionLocal, User, Group
 from config import ADMIN_PASSWORD
+
+
+def run_async(coro):
+    """Run an async coroutine from a synchronous Flask route."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
+
 
 def create_app(bot_app):
     app = Flask(__name__)
@@ -83,7 +101,6 @@ def create_app(bot_app):
             bot = current_app.config['BOT_APP'].bot
 
             now = datetime.utcnow()
-            # Use admin-specified days only if provided, otherwise default to 30
             days = int(request.form.get("days", 30))
             if user.payment_status == "approved" and user.expiry_date and user.expiry_date > now:
                 user.expiry_date += timedelta(days=days)
@@ -93,13 +110,13 @@ def create_app(bot_app):
             user.payment_status = "approved"
             user.banned = False
 
-            # Generate single-use invite link for the group the user subscribed to
+            # Generate single-use invite link
             try:
-                invite = await bot.create_chat_invite_link(
+                invite = run_async(bot.create_chat_invite_link(
                     chat_id=group.chat_id,
                     member_limit=1,
                     name=f"User_{telegram_id}"
-                )
+                ))
                 user.invite_link = invite.invite_link
                 user.invite_link_used = False
             except Exception as e:
@@ -110,16 +127,16 @@ def create_app(bot_app):
             db.commit()
 
             try:
-                await bot.send_message(
+                run_async(bot.send_message(
                     chat_id=telegram_id,
                     text=(
-                        "Subscription approved.\n"
+                        "✅ Subscription approved.\n"
                         f"Group: {group.name}\n"
                         f"Your access expires on: {user.expiry_date.strftime('%Y-%m-%d %H:%M')} UTC\n\n"
                         f"One-time invite link: {user.invite_link}\n"
                         "This link works only for your account - do not share it."
                     )
-                )
+                ))
             except Exception:
                 pass
 
@@ -139,9 +156,11 @@ def create_app(bot_app):
                 db.commit()
                 bot = current_app.config['BOT_APP'].bot
                 try:
-                    await bot.send_message(chat_id=telegram_id,
-                                           text="Your payment was rejected. Please contact support.")
-                except:
+                    run_async(bot.send_message(
+                        chat_id=telegram_id,
+                        text="❌ Your payment was rejected. Please contact support."
+                    ))
+                except Exception:
                     pass
                 flash(f"User {telegram_id} rejected.", "warning")
         finally:
@@ -178,8 +197,11 @@ def create_app(bot_app):
                 db.commit()
                 bot = current_app.config['BOT_APP'].bot
                 try:
-                    await bot.ban_chat_member(chat_id=user.group.chat_id, user_id=telegram_id)
-                except:
+                    run_async(bot.ban_chat_member(
+                        chat_id=user.group.chat_id,
+                        user_id=telegram_id
+                    ))
+                except Exception:
                     pass
                 flash(f"User {telegram_id} banned and kicked.", "danger")
         finally:
@@ -197,8 +219,11 @@ def create_app(bot_app):
                 db.commit()
                 bot = current_app.config['BOT_APP'].bot
                 try:
-                    await bot.unban_chat_member(chat_id=user.group.chat_id, user_id=telegram_id)
-                except:
+                    run_async(bot.unban_chat_member(
+                        chat_id=user.group.chat_id,
+                        user_id=telegram_id
+                    ))
+                except Exception:
                     pass
                 flash(f"User {telegram_id} unbanned.", "success")
         finally:
