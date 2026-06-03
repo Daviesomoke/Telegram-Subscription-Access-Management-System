@@ -1,15 +1,21 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float
+
+
+
+
+from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, DateTime, Text, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from config import DATABASE_URL, GROUPS_CONFIG
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-# psycopg3 uses postgresql+psycopg:// prefix
+
+# psycopg3 requires postgresql+psycopg:// prefix
 if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
     DATABASE_URL_FINAL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1).replace("postgres://", "postgresql+psycopg://", 1)
 else:
     DATABASE_URL_FINAL = DATABASE_URL
+
 engine = create_engine(DATABASE_URL_FINAL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
@@ -21,7 +27,7 @@ class Group(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    chat_id = Column(Integer, unique=True, nullable=False)
+    chat_id = Column(BigInteger, unique=True, nullable=False)
     monthly_price = Column(Float, nullable=False, default=10.0)
 
     users = relationship("User", back_populates="group")
@@ -30,11 +36,11 @@ class Group(Base):
 class User(Base):
     __tablename__ = "users"
 
-    telegram_id = Column(Integer, primary_key=True)
+    telegram_id = Column(BigInteger, primary_key=True)
     username = Column(String, nullable=True)
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
     group = relationship("Group", back_populates="users")
-    payment_status = Column(String, default="pending")   # pending, approved, rejected, expired
+    payment_status = Column(String, default="pending")
     payment_method = Column(String, nullable=True)
     transaction_ref = Column(Text, nullable=True)
     invite_link = Column(Text, nullable=True)
