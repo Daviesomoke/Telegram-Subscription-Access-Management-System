@@ -54,6 +54,15 @@ def create_app(bot_app=None):
                 return redirect(url_for("dashboard"))
             flash("Wrong password", "error")
         return render_template("admin_login.html")
+    
+
+
+     @app.route("/health")
+def health():
+    return "OK", 200
+    
+
+  
 
     @app.route("/admin/logout")
     def logout():

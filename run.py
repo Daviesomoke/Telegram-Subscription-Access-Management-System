@@ -13,21 +13,11 @@ import time
 import os
 from datetime import datetime
 from models import SessionLocal, User, Group
-
-try:
-    from models import SessionLocal, User, Group
-    from bot import setup_bot
-    from app import create_app
-    print("All imports successful")
-except Exception as e:
-    import traceback
-    print("IMPORT ERROR:", e)
-    traceback.print_exc()
-    raise
+from bot import setup_bot
+from app import create_app
 
 
 async def kick_expired_user(bot, chat_id, user_id):
-    """Kick and immediately unban so user can rejoin later if they renew."""
     await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
     await bot.unban_chat_member(chat_id=chat_id, user_id=user_id)
     try:
@@ -43,7 +33,6 @@ async def kick_expired_user(bot, chat_id, user_id):
 
 
 def expire_checker(bot_app):
-    """Background thread: kicks users with expired subscriptions from their groups."""
     while True:
         db = SessionLocal()
         try:
@@ -54,7 +43,6 @@ def expire_checker(bot_app):
                 User.banned == False,
                 User.joined == True
             ).all()
-
             for user in expired_users:
                 try:
                     group = db.query(Group).get(user.group_id) if user.group_id else None
@@ -75,32 +63,28 @@ def expire_checker(bot_app):
 
 
 def run_flask(flask_app, port):
-    """Run Flask in its own thread."""
     flask_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 
 async def main():
-    """Main async entry point — runs bot polling and Flask together."""
     bot_app = setup_bot()
     flask_app = create_app(bot_app)
 
-    # Start expiry checker thread
-    checker_thread = threading.Thread(target=expire_checker, args=(bot_app,), daemon=True)
-    checker_thread.start()
-
-    # Start Flask in a background thread
     port = int(os.environ.get("PORT", 5000))
     flask_thread = threading.Thread(target=run_flask, args=(flask_app, port), daemon=True)
     flask_thread.start()
     print(f"Flask dashboard running on port {port}")
 
-    # Run bot polling inside the async event loop
+    await asyncio.sleep(2)
+
+    checker_thread = threading.Thread(target=expire_checker, args=(bot_app,), daemon=True)
+    checker_thread.start()
+
     print("Bot polling started...")
     async with bot_app:
         await bot_app.initialize()
         await bot_app.start()
         await bot_app.updater.start_polling()
-        # Keep running forever
         while True:
             await asyncio.sleep(3600)
 

@@ -1,3 +1,11 @@
+
+
+
+
+
+
+
+
 services:
   - type: web
     name: subbot-dashboard
@@ -5,6 +13,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python run.py
     plan: free
+    healthCheckPath: /health
     envVars:
       - key: BOT_TOKEN
         sync: false
