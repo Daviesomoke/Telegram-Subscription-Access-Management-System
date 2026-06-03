@@ -1,5 +1,14 @@
+
+
+
+
+
+
+
+
+
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -26,12 +35,10 @@ from config import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Conversation states
 SELECT_GROUP, SELECT_DURATION, SELECT_PAYMENT, UPLOAD_PROOF = range(4)
 
 
 def get_payment_text(method, price):
-    """Return payment instructions for the given method and price."""
     if method == "mpesa":
         return (
             f"M-Pesa\n"
@@ -73,7 +80,6 @@ def get_payment_text(method, price):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show list of available groups."""
     db = SessionLocal()
     try:
         groups = db.query(Group).all()
@@ -95,7 +101,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User selected a group - store it and ask for duration."""
     query = update.callback_query
     await query.answer()
     group_id = int(query.data.split("_")[1])
@@ -127,7 +132,6 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User selected duration - store it and show payment methods."""
     query = update.callback_query
     await query.answer()
     _, months, price = query.data.split("_")
@@ -146,7 +150,6 @@ async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("USDT TRC20", callback_data="pay_usdt")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await query.edit_message_text(
         f"Duration: {months} month(s)\nPrice: ${price}\n\nChoose your payment method:",
         reply_markup=reply_markup,
@@ -155,7 +158,6 @@ async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User chose payment method - show instructions and ask for proof."""
     query = update.callback_query
     await query.answer()
     method = query.data.replace("pay_", "")
@@ -170,11 +172,12 @@ async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User sent payment proof - save to DB and notify admin."""
     user = update.effective_user
     method = context.user_data.get("payment_method", "unknown")
 
-    if update.message.photo:
+    is_photo = bool(update.message.photo)
+
+    if is_photo:
         ref = f"Photo: {update.message.photo[-1].file_id}"
     else:
         ref = update.message.text
@@ -193,23 +196,43 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db_user.updated_at = datetime.utcnow()
         db.commit()
 
+        # Get group name for admin notification
+        group_name = "N/A"
+        if db_user.group_id:
+            grp = db.query(Group).get(db_user.group_id)
+            if grp:
+                group_name = grp.name
+
         if ADMIN_CHAT_ID:
-            admin_msg = (
-                "New Payment Pending\n"
+            caption = (
+                f"🔔 New Payment Pending\n"
                 f"User: @{user.username or 'N/A'} (ID: {user.id})\n"
-                f"Group ID: {db_user.group_id}\n"
+                f"Group: {group_name}\n"
                 f"Duration: {context.user_data.get('months')} month(s)\n"
                 f"Price: ${context.user_data.get('price')}\n"
-                f"Method: {method}\n"
-                f"Reference: {ref[:200]}"
+                f"Method: {method}"
             )
-            await context.bot.send_message(ADMIN_CHAT_ID, admin_msg)
+
+            if is_photo:
+                # Forward the actual photo to admin with caption
+                await context.bot.send_photo(
+                    chat_id=ADMIN_CHAT_ID,
+                    photo=update.message.photo[-1].file_id,
+                    caption=caption
+                )
+            else:
+                # Send text reference to admin
+                await context.bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"{caption}\nReference: {ref[:200]}"
+                )
+
     finally:
         db.close()
 
     await update.message.reply_text(
-        "Payment proof received. An admin will review it shortly. "
-        "You will receive an invite link after approval."
+        "✅ Payment proof received. An admin will review it shortly.\n"
+        "You will receive an invite link once approved."
     )
     return ConversationHandler.END
 
