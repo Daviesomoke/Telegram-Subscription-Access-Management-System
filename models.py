@@ -4,9 +4,13 @@ from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from config import DATABASE_URL, GROUPS_CONFIG
 
-# connect_args check_same_thread is SQLite-only
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# psycopg3 uses postgresql+psycopg:// prefix
+if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL_FINAL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1).replace("postgres://", "postgresql+psycopg://", 1)
+else:
+    DATABASE_URL_FINAL = DATABASE_URL
+engine = create_engine(DATABASE_URL_FINAL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
