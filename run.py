@@ -3,10 +3,16 @@
 
 
 
+
+
+
+
 import asyncio
 import threading
 import time
 import os
+from datetime import datetime
+from models import SessionLocal, User, Group
 
 try:
     from models import SessionLocal, User, Group
@@ -18,20 +24,6 @@ except Exception as e:
     print("IMPORT ERROR:", e)
     traceback.print_exc()
     raise
-
-
-
-
-
-
-import asyncio
-import threading
-import time
-import os
-from datetime import datetime
-from models import SessionLocal, User, Group
-from bot import setup_bot
-from app import create_app
 
 
 async def kick_expired_user(bot, chat_id, user_id):
@@ -82,7 +74,13 @@ def expire_checker(bot_app):
         time.sleep(3600)
 
 
-if __name__ == "__main__":
+def run_flask(flask_app, port):
+    """Run Flask in its own thread."""
+    flask_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+
+
+async def main():
+    """Main async entry point — runs bot polling and Flask together."""
     bot_app = setup_bot()
     flask_app = create_app(bot_app)
 
@@ -91,14 +89,21 @@ if __name__ == "__main__":
     checker_thread.start()
 
     # Start Flask in a background thread
-    # Render requires the web service to bind to $PORT
     port = int(os.environ.get("PORT", 5000))
-    flask_thread = threading.Thread(
-        target=lambda: flask_app.run(host="0.0.0.0", port=port, debug=False),
-        daemon=True
-    )
+    flask_thread = threading.Thread(target=run_flask, args=(flask_app, port), daemon=True)
     flask_thread.start()
-
     print(f"Flask dashboard running on port {port}")
+
+    # Run bot polling inside the async event loop
     print("Bot polling started...")
-    bot_app.run_polling()
+    async with bot_app:
+        await bot_app.initialize()
+        await bot_app.start()
+        await bot_app.updater.start_polling()
+        # Keep running forever
+        while True:
+            await asyncio.sleep(3600)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
