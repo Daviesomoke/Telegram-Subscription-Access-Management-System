@@ -1,31 +1,36 @@
+
+
+
+
+
+
+
+
+
 import os
 import asyncio
-from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app
+import concurrent.futures
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import datetime, timedelta
 from models import SessionLocal, User, Group
 from config import ADMIN_PASSWORD
 
 
 def run_async(coro):
-    """Run an async coroutine from a synchronous Flask route."""
+    """Safely run an async coroutine from a sync Flask route."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        return asyncio.run(coro)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    except Exception as e:
+        raise e
+    finally:
+        loop.close()
 
 
 def create_app(bot_app=None):
     app = Flask(__name__)
-
-    # IMPORTANT: use a fixed secret key from env so sessions survive restarts on Render
-    app.secret_key = os.getenv("SECRET_KEY", os.urandom(24))
+    app.secret_key = os.getenv("SECRET_KEY", "fallback-secret-key-change-me")
     app.config['BOT_APP'] = bot_app
 
     def login_required(view):
@@ -70,7 +75,6 @@ def create_app(bot_app=None):
                 User.payment_status == "approved",
                 User.expiry_date <= datetime.utcnow(),
             ).all()
-
             return render_template("dashboard.html",
                                    pending=pending,
                                    approved=approved,
@@ -87,22 +91,18 @@ def create_app(bot_app=None):
             if not user:
                 flash("User not found", "error")
                 return redirect(url_for("dashboard"))
-
             if not user.group_id:
                 flash("User has no group assigned.", "error")
                 return redirect(url_for("dashboard"))
-
             group = db.query(Group).get(user.group_id)
             if not group:
                 flash("Group not found.", "error")
                 return redirect(url_for("dashboard"))
 
-            bot_app_instance = current_app.config.get('BOT_APP')
-            if not bot_app_instance:
-                flash("Bot is not running in this service. Approve from the worker service.", "error")
+            bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
+            if not bot:
+                flash("Bot not available.", "error")
                 return redirect(url_for("dashboard"))
-
-            bot = bot_app_instance.bot
 
             now = datetime.utcnow()
             days = int(request.form.get("days", 30))
@@ -157,10 +157,10 @@ def create_app(bot_app=None):
             if user:
                 user.payment_status = "rejected"
                 db.commit()
-                bot_app_instance = current_app.config.get('BOT_APP')
-                if bot_app_instance:
+                bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
+                if bot:
                     try:
-                        run_async(bot_app_instance.bot.send_message(
+                        run_async(bot.send_message(
                             chat_id=telegram_id,
                             text="❌ Your payment was rejected. Please contact support."
                         ))
@@ -199,10 +199,10 @@ def create_app(bot_app=None):
             if user and user.group:
                 user.banned = True
                 db.commit()
-                bot_app_instance = current_app.config.get('BOT_APP')
-                if bot_app_instance:
+                bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
+                if bot:
                     try:
-                        run_async(bot_app_instance.bot.ban_chat_member(
+                        run_async(bot.ban_chat_member(
                             chat_id=user.group.chat_id,
                             user_id=telegram_id
                         ))
@@ -222,10 +222,10 @@ def create_app(bot_app=None):
             if user and user.group:
                 user.banned = False
                 db.commit()
-                bot_app_instance = current_app.config.get('BOT_APP')
-                if bot_app_instance:
+                bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
+                if bot:
                     try:
-                        run_async(bot_app_instance.bot.unban_chat_member(
+                        run_async(bot.unban_chat_member(
                             chat_id=user.group.chat_id,
                             user_id=telegram_id
                         ))
