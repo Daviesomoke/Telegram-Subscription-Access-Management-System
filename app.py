@@ -7,9 +7,9 @@
 
 
 
+
 import os
 import asyncio
-import concurrent.futures
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import datetime, timedelta
 from models import SessionLocal, User, Group
@@ -17,13 +17,9 @@ from config import ADMIN_PASSWORD
 
 
 def run_async(coro):
-    """Safely run an async coroutine from a sync Flask route."""
+    loop = asyncio.new_event_loop()
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         return loop.run_until_complete(coro)
-    except Exception as e:
-        raise e
     finally:
         loop.close()
 
@@ -46,6 +42,10 @@ def create_app(bot_app=None):
     def index():
         return redirect(url_for("login"))
 
+    @app.route("/health")
+    def health():
+        return "OK", 200
+
     @app.route("/admin/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
@@ -54,15 +54,6 @@ def create_app(bot_app=None):
                 return redirect(url_for("dashboard"))
             flash("Wrong password", "error")
         return render_template("admin_login.html")
-    
-
-
-     @app.route("/health")
-def health():
-    return "OK", 200
-    
-
-  
 
     @app.route("/admin/logout")
     def logout():
@@ -88,6 +79,9 @@ def health():
                                    pending=pending,
                                    approved=approved,
                                    expired=expired)
+        except Exception as e:
+            flash(f"Database error: {e}", "error")
+            return render_template("dashboard.html", pending=[], approved=[], expired=[])
         finally:
             db.close()
 
@@ -107,22 +101,18 @@ def health():
             if not group:
                 flash("Group not found.", "error")
                 return redirect(url_for("dashboard"))
-
             bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
             if not bot:
                 flash("Bot not available.", "error")
                 return redirect(url_for("dashboard"))
-
             now = datetime.utcnow()
             days = int(request.form.get("days", 30))
             if user.payment_status == "approved" and user.expiry_date and user.expiry_date > now:
                 user.expiry_date += timedelta(days=days)
             else:
                 user.expiry_date = now + timedelta(days=days)
-
             user.payment_status = "approved"
             user.banned = False
-
             try:
                 invite = run_async(bot.create_chat_invite_link(
                     chat_id=group.chat_id,
@@ -135,9 +125,7 @@ def health():
                 flash(f"Failed to create invite link: {e}", "error")
                 db.rollback()
                 return redirect(url_for("dashboard"))
-
             db.commit()
-
             try:
                 run_async(bot.send_message(
                     chat_id=telegram_id,
@@ -151,7 +139,6 @@ def health():
                 ))
             except Exception:
                 pass
-
             flash(f"User {telegram_id} approved, invite link sent.", "success")
         finally:
             db.close()
