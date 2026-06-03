@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 import asyncio
 import threading
 import time
@@ -48,7 +40,6 @@ def expire_checker(bot_app):
                 try:
                     group = db.query(Group).get(user.group_id) if user.group_id else None
                     if group:
-                        # FIX: use asyncio.run() to call async bot methods from a sync thread
                         asyncio.run(kick_expired_user(
                             bot_app.bot, group.chat_id, user.telegram_id
                         ))

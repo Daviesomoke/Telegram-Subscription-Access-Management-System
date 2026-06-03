@@ -1,8 +1,3 @@
-
-
-
-
-
 import os
 import json
 from dotenv import load_dotenv
@@ -12,7 +7,10 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0"))
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///subscriptions.db")
+
+# Render gives DATABASE_URL starting with "postgres://" but SQLAlchemy 2.x needs "postgresql://"
+_raw_db_url = os.getenv("DATABASE_URL", "sqlite:///subscriptions.db")
+DATABASE_URL = _raw_db_url.replace("postgres://", "postgresql://", 1)
 
 # Parse groups config
 groups_json = os.getenv("GROUPS_CONFIG", "[]")

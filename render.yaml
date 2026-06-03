@@ -1,0 +1,78 @@
+services:
+  # Web Service - Flask admin dashboard
+  - type: web
+    name: subbot-dashboard
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: subbot-db
+          property: connectionString
+      - key: GROUPS_CONFIG
+        sync: false
+      - key: DURATION_MULTIPLIERS
+        value: '{"1":1,"3":2.7,"6":5,"12":9}'
+      - key: M_PESA_PHONE
+        sync: false
+      - key: M_PESA_NAME
+        sync: false
+      - key: SKRILL_EMAIL
+        sync: false
+      - key: NETELLER_EMAIL
+        sync: false
+      - key: REVOLUT_USERNAME
+        sync: false
+      - key: USDT_TRC20_ADDRESS
+        sync: false
+
+  # Background Worker - Telegram bot polling + expiry checker
+  - type: worker
+    name: subbot-worker
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: subbot-db
+          property: connectionString
+      - key: GROUPS_CONFIG
+        sync: false
+      - key: DURATION_MULTIPLIERS
+        value: '{"1":1,"3":2.7,"6":5,"12":9}'
+      - key: M_PESA_PHONE
+        sync: false
+      - key: M_PESA_NAME
+        sync: false
+      - key: SKRILL_EMAIL
+        sync: false
+      - key: NETELLER_EMAIL
+        sync: false
+      - key: REVOLUT_USERNAME
+        sync: false
+      - key: USDT_TRC20_ADDRESS
+        sync: false
+
+databases:
+  - name: subbot-db
+    plan: free

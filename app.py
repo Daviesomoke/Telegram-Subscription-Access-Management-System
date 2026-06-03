@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 import os
 import asyncio
 from flask import Flask, render_template, request, redirect, url_for, session, flash, current_app
@@ -28,9 +21,11 @@ def run_async(coro):
         return asyncio.run(coro)
 
 
-def create_app(bot_app):
+def create_app(bot_app=None):
     app = Flask(__name__)
-    app.secret_key = os.urandom(24)
+
+    # IMPORTANT: use a fixed secret key from env so sessions survive restarts on Render
+    app.secret_key = os.getenv("SECRET_KEY", os.urandom(24))
     app.config['BOT_APP'] = bot_app
 
     def login_required(view):
@@ -41,6 +36,10 @@ def create_app(bot_app):
                 return redirect(url_for("login"))
             return view(*args, **kwargs)
         return wrapped
+
+    @app.route("/")
+    def index():
+        return redirect(url_for("login"))
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def login():
@@ -98,7 +97,12 @@ def create_app(bot_app):
                 flash("Group not found.", "error")
                 return redirect(url_for("dashboard"))
 
-            bot = current_app.config['BOT_APP'].bot
+            bot_app_instance = current_app.config.get('BOT_APP')
+            if not bot_app_instance:
+                flash("Bot is not running in this service. Approve from the worker service.", "error")
+                return redirect(url_for("dashboard"))
+
+            bot = bot_app_instance.bot
 
             now = datetime.utcnow()
             days = int(request.form.get("days", 30))
@@ -110,7 +114,6 @@ def create_app(bot_app):
             user.payment_status = "approved"
             user.banned = False
 
-            # Generate single-use invite link
             try:
                 invite = run_async(bot.create_chat_invite_link(
                     chat_id=group.chat_id,
@@ -154,14 +157,15 @@ def create_app(bot_app):
             if user:
                 user.payment_status = "rejected"
                 db.commit()
-                bot = current_app.config['BOT_APP'].bot
-                try:
-                    run_async(bot.send_message(
-                        chat_id=telegram_id,
-                        text="❌ Your payment was rejected. Please contact support."
-                    ))
-                except Exception:
-                    pass
+                bot_app_instance = current_app.config.get('BOT_APP')
+                if bot_app_instance:
+                    try:
+                        run_async(bot_app_instance.bot.send_message(
+                            chat_id=telegram_id,
+                            text="❌ Your payment was rejected. Please contact support."
+                        ))
+                    except Exception:
+                        pass
                 flash(f"User {telegram_id} rejected.", "warning")
         finally:
             db.close()
@@ -195,14 +199,15 @@ def create_app(bot_app):
             if user and user.group:
                 user.banned = True
                 db.commit()
-                bot = current_app.config['BOT_APP'].bot
-                try:
-                    run_async(bot.ban_chat_member(
-                        chat_id=user.group.chat_id,
-                        user_id=telegram_id
-                    ))
-                except Exception:
-                    pass
+                bot_app_instance = current_app.config.get('BOT_APP')
+                if bot_app_instance:
+                    try:
+                        run_async(bot_app_instance.bot.ban_chat_member(
+                            chat_id=user.group.chat_id,
+                            user_id=telegram_id
+                        ))
+                    except Exception:
+                        pass
                 flash(f"User {telegram_id} banned and kicked.", "danger")
         finally:
             db.close()
@@ -217,14 +222,15 @@ def create_app(bot_app):
             if user and user.group:
                 user.banned = False
                 db.commit()
-                bot = current_app.config['BOT_APP'].bot
-                try:
-                    run_async(bot.unban_chat_member(
-                        chat_id=user.group.chat_id,
-                        user_id=telegram_id
-                    ))
-                except Exception:
-                    pass
+                bot_app_instance = current_app.config.get('BOT_APP')
+                if bot_app_instance:
+                    try:
+                        run_async(bot_app_instance.bot.unban_chat_member(
+                            chat_id=user.group.chat_id,
+                            user_id=telegram_id
+                        ))
+                    except Exception:
+                        pass
                 flash(f"User {telegram_id} unbanned.", "success")
         finally:
             db.close()

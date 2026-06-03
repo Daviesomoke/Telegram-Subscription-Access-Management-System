@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 import logging
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -36,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Conversation states
 SELECT_GROUP, SELECT_DURATION, SELECT_PAYMENT, UPLOAD_PROOF = range(4)
+
 
 def get_payment_text(method, price):
     """Return payment instructions for the given method and price."""
@@ -78,6 +71,7 @@ def get_payment_text(method, price):
     else:
         return "Invalid payment method selected."
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show list of available groups."""
     db = SessionLocal()
@@ -99,6 +93,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
     return SELECT_GROUP
 
+
 async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """User selected a group - store it and ask for duration."""
     query = update.callback_query
@@ -113,7 +108,6 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("Group not found. Use /start again.")
             return ConversationHandler.END
 
-        # Build duration buttons with calculated prices
         keyboard = []
         for months_str, multiplier in DURATION_MULTIPLIERS.items():
             months = int(months_str)
@@ -130,6 +124,7 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         db.close()
     return SELECT_DURATION
+
 
 async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """User selected duration - store it and show payment methods."""
@@ -158,6 +153,7 @@ async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return SELECT_PAYMENT
 
+
 async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """User chose payment method - show instructions and ask for proof."""
     query = update.callback_query
@@ -171,6 +167,7 @@ async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TY
         f"{instruction}\n\nSend a screenshot or paste the transaction reference now."
     )
     return UPLOAD_PROOF
+
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """User sent payment proof - save to DB and notify admin."""
@@ -216,9 +213,11 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operation cancelled. Use /start to try again.")
     return ConversationHandler.END
+
 
 def setup_bot() -> Application:
     app = Application.builder().token(BOT_TOKEN).build()
