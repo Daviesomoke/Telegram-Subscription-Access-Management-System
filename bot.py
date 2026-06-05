@@ -79,6 +79,9 @@ def get_payment_text(method, price):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Clear any previous conversation state
+    context.user_data.clear()
+
     db = SessionLocal()
     try:
         groups = db.query(Group).all()
@@ -91,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "Select the group you want to subscribe to:",
+            "👋 Welcome! Select the group you want to subscribe to:",
             reply_markup=reply_markup,
         )
     finally:
@@ -109,7 +112,7 @@ async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         group = db.query(Group).get(group_id)
         if not group:
-            await query.edit_message_text("Group not found. Use /start again.")
+            await query.edit_message_text("Group not found. Please use /start again.")
             return ConversationHandler.END
 
         keyboard = []
@@ -172,7 +175,14 @@ async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    method = context.user_data.get("payment_method", "unknown")
+    method = context.user_data.get("payment_method")
+
+    # If method is missing the conversation state was lost - ask to restart
+    if not method:
+        await update.message.reply_text(
+            "⚠️ Session expired. Please use /start to begin again."
+        )
+        return ConversationHandler.END
 
     is_photo = bool(update.message.photo)
 
@@ -195,7 +205,6 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db_user.updated_at = datetime.utcnow()
         db.commit()
 
-        # Get group name for admin notification
         group_name = "N/A"
         if db_user.group_id:
             grp = db.query(Group).get(db_user.group_id)
@@ -213,14 +222,12 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             if is_photo:
-                # Forward the actual photo to admin with caption
                 await context.bot.send_photo(
                     chat_id=ADMIN_CHAT_ID,
                     photo=update.message.photo[-1].file_id,
                     caption=caption
                 )
             else:
-                # Send text reference to admin
                 await context.bot.send_message(
                     chat_id=ADMIN_CHAT_ID,
                     text=f"{caption}\nReference: {ref[:200]}"
@@ -236,7 +243,15 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle any unknown commands gracefully."""
+    await update.message.reply_text(
+        "Use /start to subscribe or /cancel to cancel."
+    )
+
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text("Operation cancelled. Use /start to try again.")
     return ConversationHandler.END
 
@@ -255,15 +270,28 @@ def setup_bot() -> Application:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            SELECT_GROUP: [CallbackQueryHandler(group_chosen, pattern="^group_")],
-            SELECT_DURATION: [CallbackQueryHandler(duration_chosen, pattern="^dur_")],
-            SELECT_PAYMENT: [CallbackQueryHandler(payment_method_chosen, pattern="^pay_")],
+            SELECT_GROUP: [
+                CallbackQueryHandler(group_chosen, pattern="^group_"),
+                CommandHandler("start", start),  # allow restart mid-flow
+            ],
+            SELECT_DURATION: [
+                CallbackQueryHandler(duration_chosen, pattern="^dur_"),
+                CommandHandler("start", start),
+            ],
+            SELECT_PAYMENT: [
+                CallbackQueryHandler(payment_method_chosen, pattern="^pay_"),
+                CommandHandler("start", start),
+            ],
             UPLOAD_PROOF: [
-                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, receive_proof)
+                MessageHandler(filters.PHOTO | filters.TEXT & ~filters.COMMAND, receive_proof),
+                CommandHandler("start", start),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        # Allow user to restart conversation at any point
+        allow_reentry=True,
     )
 
     app.add_handler(conv_handler)
+    app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
     return app

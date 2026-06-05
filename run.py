@@ -5,7 +5,6 @@
 
 
 
-
 import asyncio
 import threading
 import time
@@ -69,7 +68,6 @@ async def main():
     bot_app = setup_bot()
     flask_app = create_app(bot_app)
 
-    # Start Flask first so Render health check passes
     port = int(os.environ.get("PORT", 5000))
     flask_thread = threading.Thread(target=run_flask, args=(flask_app, port), daemon=True)
     flask_thread.start()
@@ -77,7 +75,6 @@ async def main():
 
     await asyncio.sleep(2)
 
-    # Start expiry checker
     checker_thread = threading.Thread(target=expire_checker, args=(bot_app,), daemon=True)
     checker_thread.start()
 
@@ -86,9 +83,9 @@ async def main():
         await bot_app.initialize()
         await bot_app.start()
         await bot_app.updater.start_polling(
-            poll_interval=1.0,          # check for updates every second
-            timeout=30,                 # long polling timeout
-            drop_pending_updates=True,  # ignore queued messages from when bot was offline
+            poll_interval=1.0,
+            timeout=30,
+            drop_pending_updates=False,  # process queued commands after reconnect
             allowed_updates=["message", "callback_query"],
             read_timeout=30,
             write_timeout=30,
