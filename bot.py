@@ -6,7 +6,6 @@
 
 
 
-
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -243,7 +242,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def setup_bot() -> Application:
-    app = Application.builder().token(BOT_TOKEN).build()
+    from telegram.request import HTTPXRequest
+    request = HTTPXRequest(
+        connection_pool_size=8,
+        read_timeout=30,
+        write_timeout=30,
+        connect_timeout=30,
+        pool_timeout=30,
+    )
+    app = Application.builder().token(BOT_TOKEN).request(request).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
