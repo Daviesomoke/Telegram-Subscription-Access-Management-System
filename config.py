@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 import os
 import json
 from dotenv import load_dotenv
@@ -25,5 +32,4 @@ M_PESA_PHONE = os.getenv("M_PESA_PHONE", "+254700000000")
 M_PESA_NAME = os.getenv("M_PESA_NAME", "Your Name")
 SKRILL_EMAIL = os.getenv("SKRILL_EMAIL", "your@skrill.com")
 NETELLER_EMAIL = os.getenv("NETELLER_EMAIL", "your@neteller.com")
-REVOLUT_USERNAME = os.getenv("REVOLUT_USERNAME", "@revolut")
 USDT_TRC20_ADDRESS = os.getenv("USDT_TRC20_ADDRESS", "TRX1234567890")

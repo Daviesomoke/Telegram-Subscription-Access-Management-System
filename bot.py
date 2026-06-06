@@ -6,6 +6,8 @@
 
 
 
+
+
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -27,7 +29,6 @@ from config import (
     M_PESA_NAME,
     SKRILL_EMAIL,
     NETELLER_EMAIL,
-    REVOLUT_USERNAME,
     USDT_TRC20_ADDRESS,
 )
 
@@ -60,13 +61,6 @@ def get_payment_text(method, price):
             f"Email: {NETELLER_EMAIL}\n\n"
             f"Upload a screenshot of the payment confirmation."
         )
-    elif method == "revolut":
-        return (
-            f"Revolut\n"
-            f"Send ${price} USD to:\n"
-            f"Username: {REVOLUT_USERNAME}\n\n"
-            f"Upload the payment proof."
-        )
     elif method == "usdt":
         return (
             f"USDT (TRC20)\n"
@@ -79,7 +73,6 @@ def get_payment_text(method, price):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Clear any previous conversation state
     context.user_data.clear()
 
     db = SessionLocal()
@@ -148,7 +141,6 @@ async def duration_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("M-Pesa", callback_data="pay_mpesa")],
         [InlineKeyboardButton("Skrill", callback_data="pay_skrill")],
         [InlineKeyboardButton("Neteller", callback_data="pay_neteller")],
-        [InlineKeyboardButton("Revolut", callback_data="pay_revolut")],
         [InlineKeyboardButton("USDT TRC20", callback_data="pay_usdt")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -177,7 +169,6 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     method = context.user_data.get("payment_method")
 
-    # If method is missing the conversation state was lost - ask to restart
     if not method:
         await update.message.reply_text(
             "⚠️ Session expired. Please use /start to begin again."
@@ -244,7 +235,6 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle any unknown commands gracefully."""
     await update.message.reply_text(
         "Use /start to subscribe or /cancel to cancel."
     )
@@ -272,7 +262,7 @@ def setup_bot() -> Application:
         states={
             SELECT_GROUP: [
                 CallbackQueryHandler(group_chosen, pattern="^group_"),
-                CommandHandler("start", start),  # allow restart mid-flow
+                CommandHandler("start", start),
             ],
             SELECT_DURATION: [
                 CallbackQueryHandler(duration_chosen, pattern="^dur_"),
@@ -288,7 +278,6 @@ def setup_bot() -> Application:
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        # Allow user to restart conversation at any point
         allow_reentry=True,
     )
 
