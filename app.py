@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 import os
 import asyncio
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -25,7 +15,9 @@ def run_async(coro):
 
 
 def create_app(bot_app=None):
-    app = Flask(__name__)
+    app = Flask(__name__,
+                template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.'),
+                static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.'))
     app.secret_key = os.getenv("SECRET_KEY", "fallback-secret-key-change-me")
     app.config['BOT_APP'] = bot_app
 
@@ -95,51 +87,73 @@ def create_app(bot_app=None):
                 flash("User not found", "error")
                 return redirect(url_for("dashboard"))
             if not user.group_id:
-                flash("User has no group assigned.", "error")
+                flash("User has no channel assigned.", "error")
                 return redirect(url_for("dashboard"))
-            group = db.query(Group).get(user.group_id)
-            if not group:
-                flash("Group not found.", "error")
+            channel = db.query(Group).get(user.group_id)
+            if not channel:
+                flash("Channel not found.", "error")
                 return redirect(url_for("dashboard"))
+
             bot = app.config.get('BOT_APP').bot if app.config.get('BOT_APP') else None
             if not bot:
                 flash("Bot not available.", "error")
                 return redirect(url_for("dashboard"))
+
             now = datetime.utcnow()
-            days = int(request.form.get("days", 30))
+            # Use the days the user requested when they paid, fallback to form value
+            form_days = request.form.get("days")
+            if form_days:
+                days = int(form_days)
+            else:
+                days = user.pending_days or 30
+
+            # If they already have an active subscription, extend from current expiry
+            # (handles early renewals correctly)
             if user.payment_status == "approved" and user.expiry_date and user.expiry_date > now:
                 user.expiry_date += timedelta(days=days)
             else:
                 user.expiry_date = now + timedelta(days=days)
+
             user.payment_status = "approved"
             user.banned = False
-            try:
-                invite = run_async(bot.create_chat_invite_link(
-                    chat_id=group.chat_id,
-                    member_limit=1,
-                    name=f"User_{telegram_id}"
-                ))
-                user.invite_link = invite.invite_link
-                user.invite_link_used = False
-            except Exception as e:
-                flash(f"Failed to create invite link: {e}", "error")
-                db.rollback()
-                return redirect(url_for("dashboard"))
+            user.reminder_sent = False  # reset reminder flag for new subscription period
+
+            generate_new_link = True
+            # If user already has a valid unused invite link for this channel, reuse it
+            if user.invite_link and not user.invite_link_used:
+                generate_new_link = False
+
+            if generate_new_link:
+                try:
+                    invite = run_async(bot.create_chat_invite_link(
+                        chat_id=channel.chat_id,
+                        member_limit=1,
+                        name=f"User_{telegram_id}"
+                    ))
+                    user.invite_link = invite.invite_link
+                    user.invite_link_used = False
+                except Exception as e:
+                    flash(f"Failed to create invite link: {e}", "error")
+                    db.rollback()
+                    return redirect(url_for("dashboard"))
+
             db.commit()
+
             try:
                 run_async(bot.send_message(
                     chat_id=telegram_id,
                     text=(
                         "✅ Subscription approved.\n"
-                        f"Group: {group.name}\n"
+                        f"Channel: {channel.name}\n"
                         f"Your access expires on: {user.expiry_date.strftime('%Y-%m-%d %H:%M')} UTC\n\n"
-                        f"One-time invite link: {user.invite_link}\n"
+                        f"Invite link: {user.invite_link}\n"
                         "This link works only for your account - do not share it."
                     )
                 ))
             except Exception:
                 pass
-            flash(f"User {telegram_id} approved, invite link sent.", "success")
+
+            flash(f"User {telegram_id} approved for {days} days, invite link sent.", "success")
         finally:
             db.close()
         return redirect(url_for("dashboard"))
@@ -180,6 +194,7 @@ def create_app(bot_app=None):
                     user.expiry_date = now + timedelta(days=days)
                 else:
                     user.expiry_date += timedelta(days=days)
+                user.reminder_sent = False
                 db.commit()
                 flash(f"Subscription extended by {days} days.", "success")
         finally:

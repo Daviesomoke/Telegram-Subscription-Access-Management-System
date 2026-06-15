@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -35,7 +25,7 @@ from config import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SELECT_GROUP, SELECT_DURATION, SELECT_PAYMENT, UPLOAD_PROOF = range(4)
+SELECT_CHANNEL, SELECT_DURATION, SELECT_PAYMENT, UPLOAD_PROOF = range(4)
 
 
 def get_payment_text(method, price):
@@ -45,28 +35,28 @@ def get_payment_text(method, price):
             f"Send ${price} USD to:\n"
             f"Phone: {M_PESA_PHONE}\n"
             f"Name: {M_PESA_NAME}\n\n"
-            f"After payment, upload a screenshot of the confirmation message."
+            f"After payment, upload a SCREENSHOT of the confirmation message."
         )
     elif method == "skrill":
         return (
             f"Skrill\n"
             f"Send ${price} USD to:\n"
             f"Email: {SKRILL_EMAIL}\n\n"
-            f"Upload a screenshot or the transaction ID after payment."
+            f"After payment, upload a SCREENSHOT of the confirmation."
         )
     elif method == "neteller":
         return (
             f"Neteller\n"
             f"Send ${price} USD to:\n"
             f"Email: {NETELLER_EMAIL}\n\n"
-            f"Upload a screenshot of the payment confirmation."
+            f"After payment, upload a SCREENSHOT of the payment confirmation."
         )
     elif method == "usdt":
         return (
             f"USDT (TRC20)\n"
             f"Send {price} USDT to:\n"
             f"{USDT_TRC20_ADDRESS}\n\n"
-            f"Upload a screenshot of the transaction or paste the TXID."
+            f"After payment, upload a SCREENSHOT of the transaction."
         )
     else:
         return "Invalid payment method selected."
@@ -77,48 +67,78 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     db = SessionLocal()
     try:
-        groups = db.query(Group).all()
-        if not groups:
-            await update.message.reply_text("No groups available at the moment.")
+        channels = db.query(Group).all()
+        if not channels:
+            await update.message.reply_text("No channels available at the moment.")
             return ConversationHandler.END
 
         keyboard = [
-            [InlineKeyboardButton(g.name, callback_data=f"group_{g.id}")] for g in groups
+            [InlineKeyboardButton(c.name, callback_data=f"channel_{c.id}")] for c in channels
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "👋 Welcome! Select the group you want to subscribe to:",
+            "👋 Welcome! Select the channel you want to subscribe to:",
             reply_markup=reply_markup,
         )
     finally:
         db.close()
-    return SELECT_GROUP
+    return SELECT_CHANNEL
 
 
-async def group_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def channel_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    group_id = int(query.data.split("_")[1])
-    context.user_data["group_id"] = group_id
+    channel_id = int(query.data.split("_")[1])
+    context.user_data["channel_id"] = channel_id
 
     db = SessionLocal()
     try:
-        group = db.query(Group).get(group_id)
-        if not group:
-            await query.edit_message_text("Group not found. Please use /start again.")
+        channel = db.query(Group).get(channel_id)
+        if not channel:
+            await query.edit_message_text("Channel not found. Please use /start again.")
             return ConversationHandler.END
+
+        # Check if user already has an active subscription to THIS channel
+        user_id = update.effective_user.id
+        existing = db.query(User).filter_by(telegram_id=user_id).first()
+        now = datetime.utcnow()
+
+        if (existing and existing.group_id == channel_id
+                and existing.payment_status == "approved"
+                and existing.expiry_date and existing.expiry_date > now
+                and not existing.banned):
+
+            days_left = (existing.expiry_date - now).days
+            # Block re-subscribing unless within 7 days of expiry (early renewal window)
+            if days_left > 7:
+                await query.edit_message_text(
+                    f"✅ You already have an active subscription to {channel.name}.\n"
+                    f"It expires on {existing.expiry_date.strftime('%Y-%m-%d')} "
+                    f"({days_left} days left).\n\n"
+                    f"You can renew starting 7 days before expiry. "
+                    f"Use /start again closer to your renewal date."
+                )
+                return ConversationHandler.END
+            else:
+                await query.edit_message_text(
+                    f"🔄 Renewing your subscription to {channel.name}.\n"
+                    f"Current expiry: {existing.expiry_date.strftime('%Y-%m-%d')} "
+                    f"({days_left} days left).\n"
+                    f"Your new subscription will extend from your current expiry date.\n\n"
+                    f"Select subscription duration:"
+                )
 
         keyboard = []
         for months_str, multiplier in DURATION_MULTIPLIERS.items():
             months = int(months_str)
-            price = round(group.monthly_price * multiplier, 2)
+            price = round(channel.monthly_price * multiplier, 2)
             button_text = f"{months} month(s) - ${price}"
             callback_data = f"dur_{months}_{price}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(
-            f"Group: {group.name}\nSelect subscription duration:",
+        await query.message.reply_text(
+            f"Channel: {channel.name}\nSelect subscription duration:",
             reply_markup=reply_markup,
         )
     finally:
@@ -160,7 +180,9 @@ async def payment_method_chosen(update: Update, context: ContextTypes.DEFAULT_TY
     price = context.user_data.get("price", 0)
     instruction = get_payment_text(method, price)
     await query.edit_message_text(
-        f"{instruction}\n\nSend a screenshot or paste the transaction reference now."
+        f"{instruction}\n\n"
+        f"⚠️ IMPORTANT: You MUST send a SCREENSHOT image of your payment confirmation.\n"
+        f"Text-only references will not be accepted."
     )
     return UPLOAD_PROOF
 
@@ -177,10 +199,16 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     is_photo = bool(update.message.photo)
 
-    if is_photo:
-        ref = f"Photo: {update.message.photo[-1].file_id}"
-    else:
-        ref = update.message.text
+    # REQUIRE a screenshot - reject text-only submissions
+    if not is_photo:
+        await update.message.reply_text(
+            "❌ A screenshot is required as payment proof.\n\n"
+            "Please send a SCREENSHOT IMAGE of your payment confirmation "
+            "(not just text). Tap the 📎 attachment icon and select your screenshot."
+        )
+        return UPLOAD_PROOF  # stay in this state, wait for a real photo
+
+    ref = f"Photo: {update.message.photo[-1].file_id}"
 
     db = SessionLocal()
     try:
@@ -189,40 +217,35 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db_user = User(telegram_id=user.id, username=user.username)
             db.add(db_user)
 
-        db_user.group_id = context.user_data.get("group_id")
+        db_user.group_id = context.user_data.get("channel_id")
         db_user.payment_status = "pending"
         db_user.payment_method = method
         db_user.transaction_ref = ref
         db_user.updated_at = datetime.utcnow()
+        # Store the requested duration for admin reference / approval
+        db_user.pending_days = context.user_data.get("duration_days", 30)
         db.commit()
 
-        group_name = "N/A"
+        channel_name = "N/A"
         if db_user.group_id:
-            grp = db.query(Group).get(db_user.group_id)
-            if grp:
-                group_name = grp.name
+            ch = db.query(Group).get(db_user.group_id)
+            if ch:
+                channel_name = ch.name
 
         if ADMIN_CHAT_ID:
             caption = (
                 f"🔔 New Payment Pending\n"
                 f"User: @{user.username or 'N/A'} (ID: {user.id})\n"
-                f"Group: {group_name}\n"
+                f"Channel: {channel_name}\n"
                 f"Duration: {context.user_data.get('months')} month(s)\n"
                 f"Price: ${context.user_data.get('price')}\n"
                 f"Method: {method}"
             )
-
-            if is_photo:
-                await context.bot.send_photo(
-                    chat_id=ADMIN_CHAT_ID,
-                    photo=update.message.photo[-1].file_id,
-                    caption=caption
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id=ADMIN_CHAT_ID,
-                    text=f"{caption}\nReference: {ref[:200]}"
-                )
+            await context.bot.send_photo(
+                chat_id=ADMIN_CHAT_ID,
+                photo=update.message.photo[-1].file_id,
+                caption=caption
+            )
 
     finally:
         db.close()
@@ -260,8 +283,8 @@ def setup_bot() -> Application:
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            SELECT_GROUP: [
-                CallbackQueryHandler(group_chosen, pattern="^group_"),
+            SELECT_CHANNEL: [
+                CallbackQueryHandler(channel_chosen, pattern="^channel_"),
                 CommandHandler("start", start),
             ],
             SELECT_DURATION: [

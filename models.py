@@ -1,7 +1,3 @@
-
-
-
-
 from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, DateTime, Text, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -10,7 +6,6 @@ from config import DATABASE_URL, GROUPS_CONFIG
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-# psycopg3 requires postgresql+psycopg:// prefix
 if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"):
     DATABASE_URL_FINAL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1).replace("postgres://", "postgresql+psycopg://", 1)
 else:
@@ -23,6 +18,7 @@ Base = declarative_base()
 
 
 class Group(Base):
+    """Represents a Telegram channel/group available for subscription."""
     __tablename__ = "groups"
 
     id = Column(Integer, primary_key=True)
@@ -48,11 +44,32 @@ class User(Base):
     joined = Column(Boolean, default=False)
     banned = Column(Boolean, default=False)
     expiry_date = Column(DateTime, nullable=True)
+    pending_days = Column(Integer, nullable=True, default=30)  # requested duration for pending approval
+    reminder_sent = Column(Boolean, default=False)  # whether the 7-day reminder was sent
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 Base.metadata.create_all(bind=engine)
+
+
+# Lightweight migration: add new columns if the table already existed without them
+def _ensure_columns():
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing_cols = {col["name"] for col in inspector.get_columns("users")}
+    with engine.connect() as conn:
+        if "pending_days" not in existing_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN pending_days INTEGER DEFAULT 30"))
+            conn.commit()
+        if "reminder_sent" not in existing_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN reminder_sent BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+
+
+_ensure_columns()
 
 
 def seed_groups():
