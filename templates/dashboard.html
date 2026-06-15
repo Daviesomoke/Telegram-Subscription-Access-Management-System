@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,7 +29,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Username</th>
-                        <th>Group</th>
+                        <th>Channel</th>
                         <th>Method</th>
                         <th>Payment Proof</th>
                         <th>Action</th>
@@ -50,7 +40,7 @@
                     <tr>
                         <td data-label="ID">{{ u.telegram_id }}</td>
                         <td data-label="Username">@{{ u.username or 'N/A' }}</td>
-                        <td data-label="Group">{{ u.group.name if u.group else 'N/A' }}</td>
+                        <td data-label="Channel">{{ u.group.name if u.group else 'N/A' }}</td>
                         <td data-label="Method">{{ u.payment_method }}</td>
                         <td data-label="Payment Proof">
                             {% if u.transaction_ref and u.transaction_ref.startswith('Photo:') %}
@@ -92,7 +82,7 @@
                     <tr>
                         <th>ID</th>
                         <th>Username</th>
-                        <th>Group</th>
+                        <th>Channel</th>
                         <th>Expiry</th>
                         <th>Extend</th>
                         <th>Ban</th>
@@ -103,7 +93,7 @@
                     <tr>
                         <td data-label="ID">{{ u.telegram_id }}</td>
                         <td data-label="Username">@{{ u.username or 'N/A' }}</td>
-                        <td data-label="Group">{{ u.group.name if u.group else 'N/A' }}</td>
+                        <td data-label="Channel">{{ u.group.name if u.group else 'N/A' }}</td>
                         <td data-label="Expiry">{{ u.expiry_date.strftime('%Y-%m-%d') if u.expiry_date else 'N/A' }}</td>
                         <td data-label="Extend">
                             <form method="POST" action="{{ url_for('extend_user', telegram_id=u.telegram_id) }}" style="display:inline;">
