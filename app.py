@@ -5,8 +5,6 @@
 
 
 
-
-
 import os
 import asyncio
 from flask import Flask, render_template, request, redirect, url_for, session, flash
@@ -25,8 +23,8 @@ def run_async(coro):
 
 def create_app(bot_app=None):
     app = Flask(__name__,
-                template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.'),
-                static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '.'))
+                template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'),
+                static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'))
     app.secret_key = os.getenv("SECRET_KEY", "fallback-secret-key-change-me")
     app.config['BOT_APP'] = bot_app
 
@@ -46,20 +44,6 @@ def create_app(bot_app=None):
     @app.route("/health")
     def health():
         return "OK", 200
-
-    @app.route("/debug-files")
-    def debug_files():
-        import os
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        try:
-            files_here = os.listdir(base_dir)
-        except Exception as e:
-            files_here = [f"ERROR: {e}"]
-        return {
-            "app_py_location": base_dir,
-            "template_folder_configured": app.template_folder,
-            "files_in_that_folder": files_here,
-        }
 
     @app.route("/admin/login", methods=["GET", "POST"])
     def login():
